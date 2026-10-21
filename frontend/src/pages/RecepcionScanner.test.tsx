@@ -14,6 +14,7 @@ const scannerMock = vi.hoisted(() => ({
 vi.mock('../scanner/barcodeScanner', () => ({
   startBarcodeScanner: scannerMock.start,
   listCameraDevices: () => Promise.resolve(scannerMock.devices),
+  chooseBestCamera: () => undefined,
 }))
 
 const producto: Producto = {

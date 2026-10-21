@@ -40,25 +40,33 @@ export function CameraScanner({ onDetected, onClose }: { onDetected: (result: Sc
     setError(null)
 
     import('../scanner/barcodeScanner')
-      .then(async ({ listCameraDevices, startBarcodeScanner }) => {
+      .then(async ({ chooseBestCamera, listCameraDevices, startBarcodeScanner }) => {
+        const devicesBeforePermission = await listCameraDevices().catch(() => [])
+        const requestedDeviceId = selectedDeviceId ?? chooseBestCamera(devicesBeforePermission)?.deviceId
         const session = await startBarcodeScanner(video, (codigo) => {
           if (disposed || detectedRef.current) return
           detectedRef.current = true
           const recognizedAt = performance.now()
           sessionRef.current?.stop()
           onDetected({ codigo, decodeMs: recognizedAt - startedAt, recognizedAt })
-        }, selectedDeviceId)
+        }, requestedDeviceId)
         const availableDevices = await listCameraDevices().catch(() => [])
-        return { availableDevices, session }
+        return { availableDevices, preferredDevice: chooseBestCamera(availableDevices), requestedDeviceId, session }
       })
-      .then(({ availableDevices, session }) => {
+      .then(({ availableDevices, preferredDevice, requestedDeviceId, session }) => {
         if (disposed || detectedRef.current) session.stop()
         else {
-          sessionRef.current = session
-          setDevices(availableDevices)
           const stream = video.srcObject
           const activeTrack = typeof MediaStream !== 'undefined' && stream instanceof MediaStream ? stream.getVideoTracks()[0] : undefined
-          setActiveDeviceId(activeTrack?.getSettings().deviceId ?? selectedDeviceId)
+          const activeId = activeTrack?.getSettings().deviceId ?? requestedDeviceId
+          if (!selectedDeviceId && preferredDevice && preferredDevice.deviceId !== activeId) {
+            session.stop()
+            setSelectedDeviceId(preferredDevice.deviceId)
+            return
+          }
+          sessionRef.current = session
+          setDevices(availableDevices)
+          setActiveDeviceId(activeId)
           setState('scanning')
           blankTimer = window.setTimeout(() => {
             if (!disposed && video.videoWidth === 0) setState('blank')

@@ -1,4 +1,4 @@
-import { BrowserMultiFormatReader } from '@zxing/browser'
+import { BarcodeFormat, BrowserMultiFormatOneDReader } from '@zxing/browser'
 
 export interface BarcodeScannerSession {
   stop: () => void
@@ -20,6 +20,23 @@ export async function listCameraDevices(): Promise<CameraDevice[]> {
     }))
 }
 
+export function chooseBestCamera(devices: CameraDevice[]): CameraDevice | undefined {
+  const scored = devices
+    .map((device) => {
+      const label = device.label.toLocaleLowerCase()
+      let score = 0
+      if (/back|rear|environment|traser|traseir|arrière|rück/.test(label)) score += 100
+      if (/main|principal|camera 0|cámara 0/.test(label)) score += 20
+      if (/wide/.test(label) && !/ultra/.test(label)) score += 5
+      if (/front|user|selfie|frontal/.test(label)) score -= 100
+      if (/ultra|tele|macro|depth|infra|virtual|obs/.test(label)) score -= 25
+      return { device, score }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  return scored[0] && scored[0].score > 0 ? scored[0].device : undefined
+}
+
 function stopVideo(video: HTMLVideoElement) {
   const stream = video.srcObject
   if (stream instanceof MediaStream) {
@@ -37,10 +54,19 @@ export async function startBarcodeScanner(
     throw new DOMException('No hay una cámara disponible.', 'NotFoundError')
   }
 
-  const reader = new BrowserMultiFormatReader(undefined, {
-    delayBetweenScanAttempts: 100,
-    delayBetweenScanSuccess: 500,
+  const reader = new BrowserMultiFormatOneDReader(undefined, {
+    delayBetweenScanAttempts: 50,
+    delayBetweenScanSuccess: 250,
   })
+  reader.possibleFormats = [
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.ITF,
+  ]
 
   try {
     const controls = await reader.decodeFromConstraints(
@@ -68,12 +94,12 @@ export async function startBarcodeScanner(
         stopped = true
         controls.stop()
         stopVideo(video)
-        BrowserMultiFormatReader.releaseAllStreams()
+        BrowserMultiFormatOneDReader.releaseAllStreams()
       },
     }
   } catch (error) {
     stopVideo(video)
-    BrowserMultiFormatReader.releaseAllStreams()
+    BrowserMultiFormatOneDReader.releaseAllStreams()
     throw error
   }
 }
