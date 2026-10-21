@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
       host: true,
       port: 5173,
       https,
+      allowedHosts: ['.trycloudflare.com'],
       proxy: {
         '/api': { target: backendUrl, changeOrigin: true },
       },
