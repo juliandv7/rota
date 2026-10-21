@@ -4,6 +4,22 @@ export interface BarcodeScannerSession {
   stop: () => void
 }
 
+export interface CameraDevice {
+  deviceId: string
+  label: string
+}
+
+export async function listCameraDevices(): Promise<CameraDevice[]> {
+  if (!navigator.mediaDevices?.enumerateDevices) return []
+  const devices = await navigator.mediaDevices.enumerateDevices()
+  return devices
+    .filter((device) => device.kind === 'videoinput')
+    .map((device, index) => ({
+      deviceId: device.deviceId,
+      label: device.label || `Cámara ${index + 1}`,
+    }))
+}
+
 function stopVideo(video: HTMLVideoElement) {
   const stream = video.srcObject
   if (stream instanceof MediaStream) {
@@ -15,6 +31,7 @@ function stopVideo(video: HTMLVideoElement) {
 export async function startBarcodeScanner(
   video: HTMLVideoElement,
   onCode: (codigo: string) => void,
+  deviceId?: string,
 ): Promise<BarcodeScannerSession> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new DOMException('No hay una cámara disponible.', 'NotFoundError')
@@ -29,9 +46,13 @@ export async function startBarcodeScanner(
     const controls = await reader.decodeFromConstraints(
       {
         audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-        },
+        video: deviceId
+          ? { deviceId: { exact: deviceId } }
+          : {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
       },
       video,
       (result) => {

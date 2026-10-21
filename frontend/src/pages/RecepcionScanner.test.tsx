@@ -8,10 +8,12 @@ const scannerMock = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   emit: undefined as ((codigo: string) => void) | undefined,
+  devices: [] as { deviceId: string; label: string }[],
 }))
 
 vi.mock('../scanner/barcodeScanner', () => ({
   startBarcodeScanner: scannerMock.start,
+  listCameraDevices: () => Promise.resolve(scannerMock.devices),
 }))
 
 const producto: Producto = {
@@ -43,6 +45,7 @@ beforeEach(() => {
   scannerMock.start.mockReset()
   scannerMock.stop.mockReset()
   scannerMock.emit = undefined
+  scannerMock.devices = []
   scannerDisponible()
 })
 
