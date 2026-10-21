@@ -55,7 +55,7 @@ Si la base ya tenía datos, `DataInitializer` conserva esos registros. Para gara
 
 ## Cámara desde iPhone
 
-Safari exige HTTPS para `getUserMedia` cuando no se usa `localhost`. Seguí la configuración con `mkcert` de [README.md](./README.md). La URL final será `https://<IP-local>:5173`; Spring Boot puede seguir en `http://localhost:8080` porque el navegador sólo se comunica con el proxy HTTPS de Vite.
+Safari exige HTTPS para `getUserMedia` cuando no se usa `localhost`. Seguí la configuración con `mkcert` de [README.md](./README.md). Usá `mkcert -CAROOT` para localizar `rootCA.pem`, transferí sólo ese certificado al iPhone e instalalo como perfil. Nunca transfieras `rootCA-key.pem`. La URL final será `https://<IP-local>:5173`; Spring Boot puede seguir en `http://localhost:8080` porque el navegador sólo se comunica con el proxy HTTPS de Vite.
 
 Antes de la Review verificá que:
 

@@ -46,8 +46,9 @@ La cámara requiere un contexto seguro. Para un iPhone usá HTTPS con un certifi
 2. Averiguá la IP local, por ejemplo `192.168.1.25`.
 3. Generá el certificado: `mkcert 192.168.1.25 localhost 127.0.0.1`.
 4. Copiá `.env.example` a `.env` y completá `VITE_HTTPS_KEY_PATH` y `VITE_HTTPS_CERT_PATH` con las rutas absolutas de los dos archivos generados.
-5. Instalá en el iPhone la CA raíz creada por `mkcert` y habilitá su confianza en Configuración, General, Información, Confiar en certificados.
-6. Iniciá Vite y abrí `https://192.168.1.25:5173` desde Safari.
+5. Ejecutá `mkcert -CAROOT`, transferí únicamente `rootCA.pem` al iPhone y abrilo para instalar el perfil. No compartas `rootCA-key.pem`.
+6. En el iPhone habilitá la CA en Configuración, General, Información, Confiar en certificados.
+7. Iniciá Vite y abrí `https://192.168.1.25:5173` desde Safari.
 
 Vite sigue enviando `/api` al backend por su proxy, por lo que Spring Boot puede continuar en HTTP y no necesita cambios.
 
