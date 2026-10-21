@@ -7,7 +7,7 @@ El design system está en [DESIGN.md](./DESIGN.md) y el guion para mostrar el MV
 ## Requisitos
 
 - Node.js 20 o superior y npm.
-- Docker (para la base de datos) y JDK 17 (para el backend).
+- Docker, JDK 17 y Maven 3.9 (para el backend).
 
 ## 1. Levantar el backend
 
@@ -38,7 +38,20 @@ El backend no tiene CORS configurado, así que el servidor de Vite reenvía todo
 
 ### Probar desde el celular
 
-`npm run dev` escucha en toda la red local. Con el celular en el mismo wifi, abrí `http://<IP-de-tu-compu>:5173` (Vite muestra la dirección como "Network" al arrancar).
+`npm run dev` escucha en toda la red local. Para navegar sin cámara, con el celular en el mismo wifi podés abrir `http://<IP-de-tu-compu>:5173`.
+
+La cámara requiere un contexto seguro. Para un iPhone usá HTTPS con un certificado confiable que incluya la IP local de la computadora:
+
+1. Instalá `mkcert` en la computadora y ejecutá `mkcert -install`.
+2. Averiguá la IP local, por ejemplo `192.168.1.25`.
+3. Generá el certificado: `mkcert 192.168.1.25 localhost 127.0.0.1`.
+4. Copiá `.env.example` a `.env` y completá `VITE_HTTPS_KEY_PATH` y `VITE_HTTPS_CERT_PATH` con las rutas absolutas de los dos archivos generados.
+5. Instalá en el iPhone la CA raíz creada por `mkcert` y habilitá su confianza en Configuración, General, Información, Confiar en certificados.
+6. Iniciá Vite y abrí `https://192.168.1.25:5173` desde Safari.
+
+Vite sigue enviando `/api` al backend por su proxy, por lo que Spring Boot puede continuar en HTTP y no necesita cambios.
+
+La guía completa para la presentación está en [SPRINT_REVIEW_2.md](./SPRINT_REVIEW_2.md).
 
 ## 3. Usuarios de prueba
 
