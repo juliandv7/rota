@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
 import { crearProducto, getCategorias, getProductoPorCodigo, registrarLote } from '../api/endpoints'
 import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/Button'
+import { CameraScanner, type ScanResult } from '../components/CameraScanner'
 import { PageHeader } from '../components/PageHeader'
 import { Segmented } from '../components/Segmented'
 import { SelectField } from '../components/SelectField'
@@ -14,6 +15,7 @@ import type { Categoria, Lote, Producto, Ubicacion } from '../types/domain'
 
 type Paso = 'codigo' | 'nuevo' | 'lote' | 'listo'
 type Errores = Record<string, string>
+type Identificacion = { decodeMs: number; recognizedAt: number; visibleMs?: number }
 
 const UBICACIONES_RECEPCION: { value: Ubicacion; label: string }[] = [
   { value: 'DEPOSITO', label: UBICACION_LABEL.DEPOSITO },
@@ -36,17 +38,22 @@ function ProductoResumen({ producto, onCambiar }: { producto: Producto; onCambia
   )
 }
 
-function PasoCodigo({ onEncontrado, onNoExiste }: { onEncontrado: (p: Producto) => void; onNoExiste: (codigo: string) => void }) {
+function PasoCodigo({
+  onEncontrado,
+  onNoExiste,
+}: {
+  onEncontrado: (p: Producto, identificacion?: Identificacion) => void
+  onNoExiste: (codigo: string) => void
+}) {
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [buscando, setBuscando] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => inputRef.current?.focus(), [])
 
-  async function buscar(e: FormEvent) {
-    e.preventDefault()
-    const limpio = codigo.trim()
+  const buscarCodigo = useCallback(async (limpio: string, scan?: ScanResult) => {
     if (!limpio) {
       setError('Ingresá el código de barras.')
       return
@@ -54,13 +61,27 @@ function PasoCodigo({ onEncontrado, onNoExiste }: { onEncontrado: (p: Producto) 
     setError(null)
     setBuscando(true)
     try {
-      onEncontrado(await getProductoPorCodigo(limpio))
+      onEncontrado(
+        await getProductoPorCodigo(limpio),
+        scan ? { decodeMs: scan.decodeMs, recognizedAt: scan.recognizedAt } : undefined,
+      )
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) onNoExiste(limpio)
       else setError(errorMessage(err))
       setBuscando(false)
     }
+  }, [onEncontrado, onNoExiste])
+
+  async function buscar(e: FormEvent) {
+    e.preventDefault()
+    await buscarCodigo(codigo.trim())
   }
+
+  const handleDetected = useCallback((scan: ScanResult) => {
+    setScannerOpen(false)
+    setCodigo(scan.codigo)
+    void buscarCodigo(scan.codigo, scan)
+  }, [buscarCodigo])
 
   return (
     <form noValidate onSubmit={buscar} className="space-y-4">
@@ -75,9 +96,16 @@ function PasoCodigo({ onEncontrado, onNoExiste }: { onEncontrado: (p: Producto) 
         onChange={(e) => setCodigo(e.target.value)}
         error={error ?? undefined}
       />
-      <Button type="submit" fullWidth loading={buscando}>
-        {buscando ? 'Buscando' : 'Buscar producto'}
-      </Button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button type="button" fullWidth variant="secondary" disabled={buscando} onClick={() => setScannerOpen(true)}>
+          Escanear código
+        </Button>
+        <Button type="submit" fullWidth loading={buscando}>
+          {buscando ? 'Buscando' : 'Buscar producto'}
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground">También podés escribir el código si no querés usar la cámara.</p>
+      {scannerOpen && <CameraScanner onDetected={handleDetected} onClose={() => setScannerOpen(false)} />}
     </form>
   )
 }
@@ -268,6 +296,15 @@ export function RecepcionPage() {
   const [producto, setProducto] = useState<Producto | null>(null)
   const [lote, setLote] = useState<Lote | null>(null)
   const [productoCreado, setProductoCreado] = useState(false)
+  const [identificacion, setIdentificacion] = useState<Identificacion | null>(null)
+
+  useEffect(() => {
+    if (paso !== 'lote' || !producto || !identificacion || identificacion.visibleMs != null) return
+    const timer = window.setTimeout(() => {
+      setIdentificacion({ ...identificacion, visibleMs: performance.now() - identificacion.recognizedAt })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [identificacion, paso, producto])
 
   function reiniciar() {
     setPaso('codigo')
@@ -275,6 +312,7 @@ export function RecepcionPage() {
     setProducto(null)
     setLote(null)
     setProductoCreado(false)
+    setIdentificacion(null)
   }
 
   return (
@@ -283,8 +321,9 @@ export function RecepcionPage() {
 
       {paso === 'codigo' && (
         <PasoCodigo
-          onEncontrado={(p) => {
+          onEncontrado={(p, medicion) => {
             setProducto(p)
+            setIdentificacion(medicion ?? null)
             setPaso('lote')
           }}
           onNoExiste={(c) => {
@@ -310,6 +349,11 @@ export function RecepcionPage() {
       {paso === 'lote' && producto && (
         <div className="space-y-4">
           {productoCreado && <InlineAlert kind="success">Producto creado. Ahora cargá el lote.</InlineAlert>}
+          {identificacion?.visibleMs != null && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Medición local: lectura {Math.round(identificacion.decodeMs)} ms, desde el reconocimiento hasta mostrar el producto {Math.round(identificacion.visibleMs)} ms.
+            </p>
+          )}
           <PasoLote
             producto={producto}
             onCambiar={reiniciar}
